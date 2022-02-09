@@ -1,0 +1,323 @@
+---
+title: "Core III Wk 2"
+author: "Cindy Gachuhi"
+date: "28/01/2022"
+output: html_document
+---
+
+# R Week 2 IP
+## Defining the question
+
+Kira Plastinina is a Russian brand that is sold through a defunct chain of retail stores in Russia, Ukraine, Kazakhstan, Belarus, China, Philippines, and Armenia. The brand’s Sales and Marketing team would like to understand their customer’s behavior from data that they have collected over the past year. More specifically, they would like to learn the characteristics of customer groups.
+
+## Loading the dataset
+### Dataset: http://bit.ly/EcommerceCustomersDataset
+
+```{r}
+# Let us import the library 'Data Table'
+# 
+library("data.table")
+kira_data <- fread('http://bit.ly/EcommerceCustomersDataset')
+
+# preview the first 6 values
+head(kira_data)
+```
+## Cleaning the dataset
+### Removing missing values
+
+```{r}
+
+# using the function 'colSums', we can identify the total number of missing values in each column
+#
+colSums(is.na(kira_data))
+
+```
+We have quite a number of missing values. We can omit them below.
+
+```{r}
+# omitting missing values
+kira<- na.omit(kira_data)
+```
+
+```{r}
+#Let us confirm whether there are any remaining null values
+colSums(is.na(kira))
+
+#Great! No missing values.
+```
+```{r}
+#let us see how many records we have left
+rows <- nrow(kira)
+rows
+```
+
+
+### Removing duplicates
+
+```{r}
+# To get rid of duplicates, we will identify the unique values from our dataset and assign them to variable 'unique_kira'
+unique_kira <- kira[!duplicated(kira), ]
+
+# seeing what these unique items are...
+unique_kira
+
+# let us confirm whether all the duplicates have been removed
+rows <- nrow(unique_kira)
+rows
+
+#Our records have decreased, indicating the removal of duplicates. We can move on to removing the outliers.
+```
+## Checking for outliers
+An outlier is an observation that is numerically distant from the rest of the data. When reviewing a boxplot, an outlier is defined as a data point that is located outside the fences (“whiskers”) of the boxplot.
+
+```{r}
+# using boxplots, we will check for outliers in various columns
+# 
+boxplot(unique_kira$BounceRates)
+boxplot(unique_kira$ExitRates)
+boxplot(unique_kira$Administrative_Duration)
+```
+
+## Univariate analysis
+### Measures of Central Tendency
+
+```{r}
+# to get the descriptive statistics of all the numerical variables, we will use the function 'summary'
+summary(unique_kira)
+#
+# since mode doesn't have an inbuilt function, we will create a variable 'mode'
+#
+mode <- function(v) {
+   uniqv <- unique(v)
+   uniqv[which.max(tabulate(match(v, uniqv)))]
+}
+
+# let us get the mode in column 'Age' 
+br.mode <- mode(unique_kira$BounceRates)
+
+#print out mode
+br.mode
+
+```
+### Measures of Dispersion
+
+```{r}
+# we already got the quantiles, minimum and maximum values
+# for the rest of the measures, we will focus on column 'ExitRates'
+#
+# range
+er.range <- range(unique_kira$ExitRates)
+er.range
+
+# variance
+# The variance is a numerical measure of how the data values is dispersed around the mean.
+er.var <- var(unique_kira$ExitRates)
+er.var
+
+# standard deviation
+er.sd <- sd(unique_kira$ExitRates)
+er.sd
+```
+
+### Univariate visualizations
+#### Frequency distribution using a barplot
+
+```{r}
+# fetching the 'Revenue' column
+rv <- unique_kira$Revenue
+
+# computing the frequency distribution using the table() function
+rv.fr <- table(rv)
+rv.fr
+
+# using a barplot to visualize this
+barplot(rv.fr)
+
+# We can observe that most of the users who visit their page, do not actually end up making any transactions
+# hence why most values end up in the category 'False'
+```
+```{r}
+# fetching the 'VisitorType' column
+vt <- unique_kira$VisitorType
+
+# computing the frequency distribution using the table() function
+vt.fr <- table(vt)
+vt.fr
+
+# using a barplot to visualize this
+barplot(vt.fr)
+
+# We can see that most of the sales are from returning customers compared to people using the brand for the first time
+```
+
+## Bivariate analysis
+
+```{r}
+# A scatterplot comparing BounceRates and ExitRates according to the regions, using ggplot
+
+ggplot(unique_kira, aes(x = `BounceRates`, y = `ExitRates`, colour = Region )) +
+  geom_point() + labs(title = 'Scatter plot for BounceRates vs ExitRates')
+
+#  This signifies a positive correlation between these two columns.
+```
+```{r}
+# Scatterplot comparing Bouncerates and ExitRates according to the browser used
+ggplot(unique_kira, aes(x = `BounceRates`, y = `ExitRates`, colour = Browser )) +
+  geom_point() + labs(title = 'Scatter plot for BounceRates vs ExitRates')
+
+# This indicates a positive correlation between the variables.
+```
+
+Conclusions: Two types of browsers are the commonly used ones among the customers in terms of sales.
+             The 'Bounce' rates are less frequent than the Exit rates or occurrences indicating that the sales platform is used by various users but some errors should be worked on for improved customer experience.
+
+
+## Unsupervised learning (K-means vs Hierarchical Clustering)
+
+```{r}
+library(readxl)
+library(FactoMineR)
+library(factoextra)
+```
+
+```{r}
+# Let us create a new dataframe with the columns we will use
+kira <- unique_kira[, c(1:10,12,13,14,15)]
+str(kira)
+```
+
+```{r}
+# Set Seed
+set.seed(1000)
+```
+
+```{r}
+# Cluster Analysis - kmeans
+kmeans_basic <- kmeans(kira, centers = 5)
+kmeans_basic_table <- data.frame(kmeans_basic$size, kmeans_basic$centers)
+kmeans_basic_df <- data.frame(Cluster = kmeans_basic$cluster, kira)
+
+# head of df
+head(kmeans_basic_df)
+```
+
+```{r}
+normalize <- function(x){
+  return ((x-min(x)) / (max(x)-min(x)))
+}
+
+kira$Administrative <- normalize(kira$Administrative)
+kira$Administrative_Duration <- normalize(kira$Administrative_Duration)
+kira$Infornational <- normalize(kira$Informational)
+kira$Informational_Duration <- normalize(kira$Informational_Duration)
+kira$ProductRelated <- normalize(kira$ProductRelated)
+kira$ProductRelated_Duration <- normalize(kira$ProductRelated_Duration)
+kira$BounceRates <- normalize(kira$BounceRates)
+kira$ExitRates <- normalize(kira$ExitRates)
+kira$PageValues <- normalize(kira$PageValues)
+kira$SpecialDay <- normalize(kira$SpecialDay)
+kira$OperatingSystems <- normalize(kira$OperatingSystems)
+kira$Browser <- normalize(kira$Browser)
+kira$Region <- normalize(kira$Region)
+kira$TrafficType <- normalize(kira$TrafficType)
+
+```
+
+```{r}
+# Running the model & checking the clusters created
+result <- kmeans(kira, 3)
+
+result$size
+```
+```{r}
+# Watching the cluster centres selected by the model
+result$centers
+```
+```{r}
+# Cluster number for each of the observations
+
+result$cluster
+```
+
+```{r}
+fviz_nbclust(scale(kira),kmeans,nstart = 100, method = "wss") +
+  geom_vline(xintercept = 5, linetype = 1)
+```
+
+```{r}
+kmeans_fancy <- kmeans(scale(kira),5,nstart = 100)
+fviz_cluster(kmeans_fancy, data = scale(kira), geom = c("point"),ellipse.type = "euclid")
+```
+```{r}
+# After preprocessing the data we build a distance matrix 
+# The run the model on the preprocessed data
+d <- dist(kira, method = "euclidean" )
+res.hc <- hclust(d, method = "ward.D2")
+```
+
+
+```{r}
+# ThE PLOT SHOWING THE RELATIONSHIP VISUALLY THE DENDOGRAM
+plot(res.hc, cex = 0.00005, hang = -100)
+```
+
+```{r}
+# We then deploy the use of albine() to draw a line that superimposes rectangular compartments foer each cluster of the tree
+plot(res.hc)
+rect.hclust(res.hc , k = 3, border = 2:6)
+abline(h = 3, col = 'red')
+```
+
+```{r}
+install.packages("dendextend")
+library(dendextend)
+```
+
+```{r}
+avg <- as.dendrogram(res.hc)
+avg.k <- color_branches(avg, h = 3)
+plot(avg.k)
+```
+
+```{r}
+cut.avg <- cutree(res.hc, k= 3)
+```
+
+```{r}
+library(dplyr)
+kira.df.cl <- mutate(kira, cluster = cut.avg)
+```
+
+
+```{r}
+count(kira.df.cl)
+```
+
+
+```{r}
+# We then evaluate the trend between two features which shows a linear relationship between the Exit rates and the Bounce rates
+library(ggplot2)
+ggplot(kira.df.cl, aes(x = BounceRates, y = ExitRates, color = factor(cluster)))+
+  geom_point()
+```
+
+```{r}
+table(kira.df.cl$cluster,kira$Administrative)
+```
+
+```{r}
+kira.sl <- eclust(kira, "hclust", k = 3, method = "complete" , graph = FALSE)
+```
+
+
+```{r}
+kira.sl
+```
+Conclusion: The K means clustering method is more economical since it required less resources as well as time to execute as compared to the hierarchical method. 
+
+Recommendations: Since the exit rates were higher than the bounce rates, it goes to show that the platform is efficient, however it just needs some improvement to reduce the exit rates.
+
+
+
+
+
